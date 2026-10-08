@@ -1,23 +1,33 @@
+import random
 from datetime import date, timedelta
 from database import SessionLocal
 import models
 
 AMENITIES = ["Wifi", "Kitchen", "Free parking", "Pool", "Air conditioning", "Washer", "TV", "Hot tub"]
 
-DATA = [
-    ("Beachfront villa with private pool", "Goa, India", "Villa", 8500),
-    ("Cozy cabin in the pine forest", "Manali, India", "Cabin", 3200),
-    ("Modern apartment near the old town", "Jaipur, India", "Apartment", 2800),
-    ("Lakeview house with garden", "Udaipur, India", "House", 5400),
-    ("Houseboat on the backwaters", "Kerala, India", "Boat", 6100),
-    ("Mountain retreat with valley views", "Shimla, India", "Cabin", 3900),
-    ("Stylish loft in the city centre", "Mumbai, India", "Apartment", 7200),
-    ("Heritage haveli with courtyard", "Jodhpur, India", "House", 4800),
-    ("Tropical treehouse getaway", "Wayanad, India", "Treehouse", 4300),
-    ("Seaside cottage steps from the sand", "Pondicherry, India", "House", 3600),
-    ("Luxury penthouse with skyline views", "Delhi, India", "Apartment", 9800),
-    ("Tea estate bungalow", "Munnar, India", "House", 5100),
+# city, property types used there, base nightly price
+CITIES = [
+    ("New Delhi", ["Apartment", "House", "Apartment"], 2500),
+    ("Goa", ["Villa", "House", "Boat"], 6000),
+    ("Jaipur", ["House", "Apartment", "Villa"], 3500),
+    ("Manali", ["Cabin", "Treehouse", "House"], 3800),
+    ("Pune", ["Apartment", "House", "Apartment"], 2200),
+    ("Mumbai", ["Apartment", "Apartment", "House"], 5200),
 ]
+ADJECTIVES = ["Cozy", "Modern", "Sunlit", "Stylish", "Peaceful", "Charming",
+              "Spacious", "Elegant", "Quiet", "Bright"]
+PHOTO_TAGS = {
+    "Apartment": "bedroom,interior", "House": "livingroom,interior", "Villa": "villa,pool",
+    "Cabin": "cabin,mountain", "Boat": "houseboat,water", "Treehouse": "treehouse,forest",
+}
+COMMENTS = [
+    "Lovely place, very clean and the host was helpful!",
+    "Exactly as described. Would stay again.",
+    "Great location and a very comfortable bed.",
+    "Peaceful stay, perfect for a short break.",
+    "Good value for money and easy check-in.",
+]
+PER_CITY = 10
 
 
 def seed():
@@ -26,6 +36,7 @@ def seed():
         db.close()
         return
 
+    rng = random.Random(7)  # fixed seed so the data is the same every time
     users = [
         models.User(name="Aarav (Host)", role="host", avatar="https://i.pravatar.cc/100?img=12"),
         models.User(name="Meera (Host)", role="host", avatar="https://i.pravatar.cc/100?img=47"),
@@ -34,29 +45,43 @@ def seed():
     db.add_all(users)
     db.commit()
 
-    for i, (title, loc, ptype, price) in enumerate(DATA):
-        db.add(models.Listing(
-            host_id=users[i % 2].id,
-            title=title,
-            description=f"{title}. A comfortable and well-equipped stay in {loc}. Perfect for families, couples and remote workers.",
-            location=loc,
-            property_type=ptype,
-            price_per_night=price,
-            max_guests=2 + (i % 5),
-            bedrooms=1 + (i % 4),
-            amenities=AMENITIES[: 4 + (i % 4)],
-            images=[f"https://picsum.photos/seed/stay{i}-{n}/900/700" for n in range(5)],
-        ))
+    count = 0
+    for city, types, base in CITIES:
+        for n in range(PER_CITY):
+            count += 1
+            ptype = types[n % 3]
+            title = f"{ADJECTIVES[n]} {ptype.lower()} in {city}"
+            db.add(models.Listing(
+                host_id=users[count % 2].id,
+                title=title,
+                description=f"{title}. A comfortable, well-equipped stay in {city}. Great for families, couples and remote workers.",
+                location=f"{city}, India",
+                property_type=ptype,
+                price_per_night=round(base * rng.uniform(0.5, 1.7) / 100) * 100,
+                max_guests=2 + (n % 4),
+                bedrooms=1 + (n % 3),
+                amenities=rng.sample(AMENITIES, rng.randint(3, 7)),
+                images=[f"https://picsum.photos/seed/stay{count}-{k}/900/700" for k in range(5)]
+                ))
     db.commit()
 
-    # a few existing bookings and reviews
+    # 4-7 reviews per listing with mixed ratings, so averages look like 4.57, 4.83...
+    for lid in range(1, count + 1):
+        for _ in range(rng.randint(4, 7)):
+            db.add(models.Review(
+                listing_id=lid, user_id=rng.choice(users).id,
+                rating=rng.choice([5, 5, 5, 5, 4, 4, 3]), comment=rng.choice(COMMENTS),
+            ))
+    db.commit()
+
+    # two existing bookings that block dates
     today = date.today()
-    db.add(models.Booking(listing_id=1, guest_id=users[2].id, check_in=today + timedelta(days=10),
-                          check_out=today + timedelta(days=14), guests=2, total_price=38000))
-    db.add(models.Booking(listing_id=2, guest_id=users[2].id, check_in=today + timedelta(days=20),
-                          check_out=today + timedelta(days=23), guests=2, total_price=10944))
-    for lid in range(1, 13):
-        db.add(models.Review(listing_id=lid, user_id=users[2].id, rating=4 + (lid % 2),
-                             comment="Lovely place, very clean and the host was helpful!"))
+    for lid, start, nights in [(1, 10, 4), (2, 20, 3)]:
+        price = db.get(models.Listing, lid).price_per_night
+        db.add(models.Booking(
+            listing_id=lid, guest_id=users[2].id, check_in=today + timedelta(days=start),
+            check_out=today + timedelta(days=start + nights), guests=2,
+            total_price=round(nights * price * 1.14),
+        ))
     db.commit()
     db.close()
