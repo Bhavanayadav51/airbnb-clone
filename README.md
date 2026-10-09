@@ -2,9 +2,9 @@
 
 A full-stack Airbnb-style web app. Guests can browse and search stays, view listing details, book a date range, and see their trips. Hosts can create, edit and delete their own listings and see reservations.
 
-- **Live demo:** https://YOUR-APP.vercel.app
-- **API docs:** https://YOUR-API.onrender.com/docs
-- **GitHub:** https://github.com/YOUR-USERNAME/airbnb-clone
+- **Live demo:** [https://YOUR-APP.vercel.app](https://airbnb-clone-alpha-five.vercel.app/)
+- **API docs:** [https://YOUR-API.onrender.com/docs](https://airbnb-clone-z3iv.onrender.com/)
+- **GitHub:** [https://github.com/YOUR-USERNAME/airbnb-clone](https://github.com/Bhavanayadav51/airbnb-clone)
 
 > The backend is on a free host that sleeps when idle, so the first request can take 30-60 seconds.
 
@@ -128,6 +128,4 @@ Full interactive docs are at `/docs`.
 - **Free hosting:** the SQLite file resets when the backend restarts, so the seed runs again on startup. Bookings on the live demo may disappear after a restart.
 - **UI** closely follows Airbnb's layout and interactions but is not pixel-exact.
 
-## Placeholders (not implemented)
 
-Messaging, identity verification, real payments, Experiences and Services tabs ("coming soon"), dark mode, and review submission after a stay.
