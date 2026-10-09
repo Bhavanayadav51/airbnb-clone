@@ -19,11 +19,16 @@ export default function ListingForm({ mode }: { mode: "create" | "edit" }) {
   const [amenities, setAmenities] = useState<string[]>([]);
   const [images, setImages] = useState(""); // one URL per line
   const [saving, setSaving] = useState(false);
+  const [loadingListing, setLoadingListing] = useState(mode === "edit");
+  const [loadError, setLoadError] = useState("");
+  const [listingHostId, setListingHostId] = useState<number | null>(null);
 
   // edit mode: load the existing listing into the form
   useEffect(() => {
     if (mode !== "edit" || !id) return;
+    let active = true;
     api<Listing>(`/listings/${id}`).then((l) => {
+      if (!active) return;
       setF({
         title: l.title, description: l.description, location: l.location,
         property_type: l.property_type, price_per_night: String(l.price_per_night),
@@ -31,8 +36,17 @@ export default function ListingForm({ mode }: { mode: "create" | "edit" }) {
       });
       setAmenities(l.amenities);
       setImages(l.images.join("\n"));
+      setListingHostId(l.host.id);
+    }).catch((err: unknown) => {
+      if (!active) return;
+      const message = err instanceof Error ? err.message : "Could not load this listing";
+      setLoadError(message);
+      toast(message, "error");
+    }).finally(() => {
+      if (active) setLoadingListing(false);
     });
-  }, [mode, id]);
+    return () => { active = false; };
+  }, [mode, id, toast]);
 
   const set = (k: keyof typeof f) => (e: Field) => setF({ ...f, [k]: e.target.value });
   const toggleAmenity = (a: string) =>
@@ -75,6 +89,17 @@ export default function ListingForm({ mode }: { mode: "create" | "edit" }) {
 
   if (user && user.role !== "host") {
     return <p className="py-24 text-center text-gray-600">Switch to a host account to manage listings.</p>;
+  }
+  if (mode === "edit" && loadingListing) {
+    return <p className="py-24 text-center text-gray-500">Loading listing...</p>;
+  }
+  if (loadError || (mode === "edit" && user && listingHostId !== user.id)) {
+    return (
+      <div className="py-24 text-center">
+        <p className="text-gray-600">{loadError || "You can only edit your own listings."}</p>
+        <button onClick={() => router.push("/host")} className="mt-4 font-semibold underline">Back to hosting</button>
+      </div>
+    );
   }
 
   const box = "w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-black";

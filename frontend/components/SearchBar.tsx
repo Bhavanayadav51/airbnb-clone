@@ -12,13 +12,26 @@ const short = (s: string) => parse(s).toLocaleDateString("en-IN", { day: "numeri
 export default function SearchBar() {
   const router = useRouter();
   const params = useSearchParams();
+  const key = params.toString();
   const [panel, setPanel] = useState<Panel>(null);
-  const [q, setQ] = useState(params.get("q") || "");
-  const [checkIn, setCheckIn] = useState(params.get("check_in") || "");
-  const [checkOut, setCheckOut] = useState(params.get("check_out") || "");
-  const [guests, setGuests] = useState(Number(params.get("guests")) || 0);
+  const [draft, setDraft] = useState<{
+    key: string; q: string; checkIn: string; checkOut: string; guests: number;
+  } | null>(null);
+  const current = draft?.key === key ? draft : null;
+  const q = current?.q ?? params.get("q") ?? "";
+  const checkIn = current?.checkIn ?? params.get("check_in") ?? "";
+  const checkOut = current?.checkOut ?? params.get("check_out") ?? "";
+  const guests = current?.guests ?? (Number(params.get("guests")) || 0);
+
+  function updateDraft(changes: Partial<Omit<NonNullable<typeof draft>, "key">>) {
+    setDraft({ key, q, checkIn, checkOut, guests, ...changes });
+  }
 
   function search() {
+    if (!!checkIn !== !!checkOut) {
+      setPanel("when");
+      return;
+    }
     const p = new URLSearchParams(params.toString());
     const set = (k: string, v: string) => (v ? p.set(k, v) : p.delete(k));
     set("q", q.trim());
@@ -50,7 +63,7 @@ export default function SearchBar() {
           <span className={label}>Where</span>
           <input
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={(e) => updateDraft({ q: e.target.value })}
             onKeyDown={(e) => e.key === "Enter" && search()}
             placeholder="Search destinations"
             className="w-full bg-transparent text-sm text-gray-700 outline-none placeholder:text-gray-500"
@@ -91,7 +104,7 @@ export default function SearchBar() {
           {DESTINATIONS.map((d) => (
             <button
               key={d}
-              onClick={() => { setQ(d); setPanel("when"); }}
+              onClick={() => { updateDraft({ q: d }); setPanel("when"); }}
               className="flex w-full items-center gap-4 rounded-xl p-3 text-left hover:bg-gray-100"
             >
               <span className="flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100 text-xl">📍</span>
@@ -107,7 +120,7 @@ export default function SearchBar() {
             booked={NO_BOOKED}
             checkIn={checkIn}
             checkOut={checkOut}
-            onChange={(a, b) => { setCheckIn(a); setCheckOut(b); if (b) setPanel("who"); }}
+            onChange={(a, b) => { updateDraft({ checkIn: a, checkOut: b }); if (b) setPanel("who"); }}
           />
         </div>
       )}
@@ -120,10 +133,10 @@ export default function SearchBar() {
               <p className="text-sm text-gray-500">Total number of guests</p>
             </div>
             <div className="flex items-center gap-4">
-              <button onClick={() => setGuests(Math.max(0, guests - 1))} disabled={guests === 0}
+              <button onClick={() => updateDraft({ guests: Math.max(0, guests - 1) })} disabled={guests === 0}
                 className="h-8 w-8 rounded-full border border-gray-400 disabled:opacity-30">−</button>
               <span className="w-4 text-center">{guests}</span>
-              <button onClick={() => setGuests(guests + 1)}
+              <button onClick={() => updateDraft({ guests: guests + 1 })}
                 className="h-8 w-8 rounded-full border border-gray-400">+</button>
             </div>
           </div>

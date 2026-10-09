@@ -37,11 +37,10 @@ export default function ListingCard({ listing, query = "" }: { listing: Listing;
           </svg>
         </button>
       </div>
-      <p className="mt-2 truncate text-[15px] font-medium">
-        {listing.property_type} in {city}
-      </p>
+      <p className="mt-2 truncate text-[15px] font-medium">{listing.title}</p>
+      <p className="truncate text-sm text-gray-500">{city}, {listing.location.split(",").slice(1).join(",").trim()}</p>
       <p className="text-sm text-gray-500">
-        {inr(listing.price_per_night)} for 1 night
+        <span className="font-medium text-[#222]">{inr(listing.price_per_night)}</span> night
         {listing.rating ? ` · ★ ${listing.rating.toFixed(2)}` : ""}
       </p>
     </Link>

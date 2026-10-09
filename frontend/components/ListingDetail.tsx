@@ -13,24 +13,37 @@ import CheckoutModal from "./CheckoutModal";
 export default function ListingDetail() {
   const { id } = useParams<{ id: string }>();
   const sp = useSearchParams();
+  const searchKey = sp.toString();
   const { user, toast, wishlist, toggleWishlist } = useApp();
 
   const [listing, setListing] = useState<Listing | null>(null);
   const [booked, setBooked] = useState<Set<string>>(new Set());
   const [error, setError] = useState("");
-  const [checkIn, setCheckIn] = useState(sp.get("check_in") || "");
-  const [checkOut, setCheckOut] = useState(sp.get("check_out") || "");
-  const [guests, setGuests] = useState(Number(sp.get("guests")) || 1);
+  const [bookingDraft, setBookingDraft] = useState<{
+    key: string; checkIn: string; checkOut: string; guests: number;
+  } | null>(null);
+  const currentDraft = bookingDraft?.key === searchKey ? bookingDraft : null;
+  const checkIn = currentDraft?.checkIn ?? sp.get("check_in") ?? "";
+  const checkOut = currentDraft?.checkOut ?? sp.get("check_out") ?? "";
+  const guests = currentDraft?.guests ?? (Number(sp.get("guests")) || 1);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
 
   const loadBooked = useCallback(
-    () => api<string[]>(`/listings/${id}/booked-dates`).then((d) => setBooked(new Set(d))),
-    [id]
+    async () => {
+      try {
+        const dates = await api<string[]>(`/listings/${id}/booked-dates`);
+        setBooked(new Set(dates));
+      } catch {
+        toast("Could not load this listing's availability", "error");
+        setError("Availability could not be loaded. Please try again.");
+      }
+    },
+    [id, toast]
   );
 
   useEffect(() => {
     api<Listing>(`/listings/${id}`).then(setListing).catch(() => setError("This listing could not be found."));
-    loadBooked();
+    void Promise.resolve().then(loadBooked);
   }, [id, loadBooked]);
 
   if (error) return <p className="py-20 text-center text-gray-600">{error}</p>;
@@ -38,6 +51,10 @@ export default function ListingDetail() {
 
   const saved = wishlist.includes(listing.id);
   const nights = checkIn && checkOut ? nightsBetween(checkIn, checkOut) : 0;
+
+  function updateBookingDraft(changes: Partial<Omit<NonNullable<typeof bookingDraft>, "key">>) {
+    setBookingDraft({ key: searchKey, checkIn, checkOut, guests, ...changes });
+  }
 
   function reserve() {
     if (!user || !listing) return;
@@ -95,7 +112,7 @@ export default function ListingDetail() {
               booked={booked}
               checkIn={checkIn}
               checkOut={checkOut}
-              onChange={(a, b) => { setCheckIn(a); setCheckOut(b); }}
+              onChange={(a, b) => updateBookingDraft({ checkIn: a, checkOut: b })}
             />
           </div>
 
@@ -133,7 +150,7 @@ export default function ListingDetail() {
             checkIn={checkIn}
             checkOut={checkOut}
             guests={guests}
-            setGuests={setGuests}
+            setGuests={(n) => updateBookingDraft({ guests: n })}
             onReserve={reserve}
           />
         </div>
@@ -145,7 +162,10 @@ export default function ListingDetail() {
           checkIn={checkIn}
           checkOut={checkOut}
           guests={guests}
-          onClose={() => { setCheckoutOpen(false); setCheckIn(""); setCheckOut(""); }}
+          onClose={() => {
+            setCheckoutOpen(false);
+            updateBookingDraft({ checkIn: "", checkOut: "" });
+          }}
           onBooked={loadBooked}
         />
       )}

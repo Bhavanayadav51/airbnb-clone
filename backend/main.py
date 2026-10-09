@@ -2,7 +2,7 @@ from datetime import date, timedelta
 from typing import Optional, List
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import or_, func, cast, String
 from sqlalchemy.orm import Session
 
@@ -22,24 +22,24 @@ def startup():
 
 # ---------- request bodies ----------
 class ListingIn(BaseModel):
-    host_id: int
-    title: str
-    description: str = ""
-    location: str
+    host_id: int = Field(gt=0)
+    title: str = Field(min_length=1, max_length=120)
+    description: str = Field(default="", max_length=5000)
+    location: str = Field(min_length=1, max_length=160)
     property_type: str = "House"
-    price_per_night: float
-    max_guests: int = 2
-    bedrooms: int = 1
-    amenities: List[str] = []
-    images: List[str] = []
+    price_per_night: float = Field(gt=0)
+    max_guests: int = Field(default=2, ge=1, le=50)
+    bedrooms: int = Field(default=1, ge=1, le=50)
+    amenities: List[str] = Field(default_factory=list)
+    images: List[str] = Field(default_factory=list, min_length=1)
 
 
 class BookingIn(BaseModel):
-    listing_id: int
-    guest_id: int
+    listing_id: int = Field(gt=0)
+    guest_id: int = Field(gt=0)
     check_in: date
     check_out: date
-    guests: int = 1
+    guests: int = Field(default=1, ge=1)
 
 
 # ---------- helpers ----------
@@ -90,6 +90,22 @@ def search_listings(
     check_in: Optional[date] = None, check_out: Optional[date] = None,
     page: int = 1, page_size: int = 12, db: Session = Depends(get_db),
 ):
+    if page < 1 or not 1 <= page_size <= 100:
+        raise HTTPException(400, "Page must be positive and page_size must be between 1 and 100")
+    if min_price is not None and min_price < 0:
+        raise HTTPException(400, "Minimum price cannot be negative")
+    if max_price is not None and max_price < 0:
+        raise HTTPException(400, "Maximum price cannot be negative")
+    if min_price is not None and max_price is not None and min_price > max_price:
+        raise HTTPException(400, "Minimum price cannot exceed maximum price")
+    if (check_in is None) != (check_out is None):
+        raise HTTPException(400, "Both check-in and check-out dates are required")
+    if check_in and check_out:
+        if check_in < date.today():
+            raise HTTPException(400, "Check-in cannot be in the past")
+        if check_out <= check_in:
+            raise HTTPException(400, "Check-out must be after check-in")
+
     query = db.query(models.Listing)
     if q:
         like = f"%{q}%"
@@ -103,8 +119,8 @@ def search_listings(
     if guests:
         query = query.filter(models.Listing.max_guests >= guests)
     if amenities:
-     for a in amenities.split(","):
-        query = query.filter(cast(models.Listing.amenities, String).like(f'%"{a.strip()}"%'))
+        for a in amenities.split(","):
+            query = query.filter(cast(models.Listing.amenities, String).like(f'%"{a.strip()}"%'))
     if check_in and check_out:
         booked = db.query(models.Booking.listing_id).filter(
             models.Booking.status == "confirmed",
@@ -146,6 +162,8 @@ def create_listing(body: ListingIn, db: Session = Depends(get_db)):
     host = db.get(models.User, body.host_id)
     if not host or host.role != "host":
         raise HTTPException(403, "Only hosts can create listings")
+    if not body.title.strip() or not body.location.strip():
+        raise HTTPException(422, "Title and location cannot be blank")
     l = models.Listing(**body.model_dump())
     db.add(l)
     db.commit()
@@ -160,6 +178,8 @@ def update_listing(listing_id: int, body: ListingIn, db: Session = Depends(get_d
         raise HTTPException(404, "Listing not found")
     if l.host_id != body.host_id:
         raise HTTPException(403, "Not your listing")
+    if not body.title.strip() or not body.location.strip():
+        raise HTTPException(422, "Title and location cannot be blank")
     for k, v in body.model_dump().items():
         setattr(l, k, v)
     db.commit()
@@ -186,6 +206,11 @@ def create_booking(body: BookingIn, db: Session = Depends(get_db)):
     l = db.get(models.Listing, body.listing_id)
     if not l:
         raise HTTPException(404, "Listing not found")
+    guest = db.get(models.User, body.guest_id)
+    if not guest or guest.role != "guest":
+        raise HTTPException(403, "Only guest accounts can book a stay")
+    if body.guest_id == l.host_id:
+        raise HTTPException(400, "You can't book your own listing")
     if body.check_in < date.today():
         raise HTTPException(400, "Check-in cannot be in the past")
     if body.check_out <= body.check_in:
@@ -213,10 +238,12 @@ def my_trips(guest_id: int, db: Session = Depends(get_db)):
 
 
 @app.delete("/bookings/{booking_id}")
-def cancel_booking(booking_id: int, db: Session = Depends(get_db)):
+def cancel_booking(booking_id: int, guest_id: int, db: Session = Depends(get_db)):
     b = db.get(models.Booking, booking_id)
     if not b:
         raise HTTPException(404, "Booking not found")
+    if b.guest_id != guest_id:
+        raise HTTPException(403, "You can only cancel your own reservation")
     b.status = "cancelled"  # cancelled bookings no longer block dates
     db.commit()
     return {"cancelled": True}

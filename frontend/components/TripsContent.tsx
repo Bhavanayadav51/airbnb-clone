@@ -5,30 +5,41 @@ import { useCallback, useEffect, useState } from "react";
 import { api, Booking, inr } from "@/lib/api";
 import { useApp } from "@/lib/AppContext";
 import { fmt, iso } from "@/lib/dates";
+import ConfirmationDialog from "./ConfirmationDialog";
 
 export default function TripsContent() {
   const { user, toast } = useApp();
   const [trips, setTrips] = useState<Booking[] | null>(null);
+  const [pendingCancel, setPendingCancel] = useState<Booking | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   const load = useCallback(() => {
     if (!user) return;
     api<Booking[]>(`/bookings?guest_id=${user.id}`)
       .then(setTrips)
-      .catch(() => toast("Could not load your trips", "error"));
+      .catch(() => {
+        toast("Could not load your trips", "error");
+        setTrips([]);
+      });
   }, [user, toast]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  async function cancel(id: number) {
-    if (!confirm("Cancel this reservation?")) return;
+  async function cancel() {
+    if (!user) return;
+    if (!pendingCancel) return;
+    setCancelling(true);
     try {
-      await api(`/bookings/${id}`, { method: "DELETE" });
+      await api(`/bookings/${pendingCancel.id}?guest_id=${user.id}`, { method: "DELETE" });
       toast("Reservation cancelled");
-      load();
+      setPendingCancel(null);
+      await load();
     } catch (e) {
       toast((e as Error).message, "error");
+    } finally {
+      setCancelling(false);
     }
   }
 
@@ -61,7 +72,7 @@ export default function TripsContent() {
               )}
             </p>
             {isUpcoming(t) && (
-              <button onClick={() => cancel(t.id)} className="text-sm font-semibold underline">
+              <button onClick={() => setPendingCancel(t)} className="text-sm font-semibold underline">
                 Cancel
               </button>
             )}
@@ -92,6 +103,18 @@ export default function TripsContent() {
           <h2 className="mb-4 text-xl font-semibold">Where you&apos;ve been</h2>
           <div className="space-y-4">{past.map((t) => <TripCard key={t.id} t={t} />)}</div>
         </>
+      )}
+      {pendingCancel && (
+        <ConfirmationDialog
+          title="Cancel this reservation?"
+          description={`Your stay at ${pendingCancel.listing_title} from ${fmt(pendingCancel.check_in)} to ${fmt(pendingCancel.check_out)} will be cancelled. You can’t undo this action.`}
+          cancelLabel="Keep reservation"
+          confirmLabel="Cancel reservation"
+          busyLabel="Cancelling..."
+          busy={cancelling}
+          onCancel={() => setPendingCancel(null)}
+          onConfirm={cancel}
+        />
       )}
     </div>
   );

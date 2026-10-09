@@ -5,30 +5,50 @@ import { useCallback, useEffect, useState } from "react";
 import { api, Booking, Listing, inr } from "@/lib/api";
 import { useApp } from "@/lib/AppContext";
 import { fmt } from "@/lib/dates";
+import ConfirmationDialog from "./ConfirmationDialog";
 
 export default function HostDashboard() {
   const { user, toast } = useApp();
   const [listings, setListings] = useState<Listing[] | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loadError, setLoadError] = useState("");
+  const [pendingDelete, setPendingDelete] = useState<Listing | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     if (!user || user.role !== "host") return;
-    api<Listing[]>(`/host/${user.id}/listings`).then(setListings);
-    api<Booking[]>(`/host/${user.id}/bookings`).then(setBookings);
-  }, [user]);
+    setLoadError("");
+    try {
+      const [hostListings, hostBookings] = await Promise.all([
+        api<Listing[]>(`/host/${user.id}/listings`),
+        api<Booking[]>(`/host/${user.id}/bookings`),
+      ]);
+      setListings(hostListings);
+      setBookings(hostBookings);
+    } catch {
+      setLoadError("Could not load host information. Please try again.");
+      toast("Could not load host information", "error");
+      setListings([]);
+      setBookings([]);
+    }
+  }, [user, toast]);
 
   useEffect(() => {
-    load();
+    void Promise.resolve().then(load);
   }, [load]);
 
-  async function remove(l: Listing) {
-    if (!user || !confirm(`Delete "${l.title}"? Its bookings will be removed too.`)) return;
+  async function remove() {
+    if (!user || !pendingDelete) return;
+    setDeleting(true);
     try {
-      await api(`/listings/${l.id}?host_id=${user.id}`, { method: "DELETE" });
+      await api(`/listings/${pendingDelete.id}?host_id=${user.id}`, { method: "DELETE" });
       toast("Listing deleted");
-      load();
+      setPendingDelete(null);
+      await load();
     } catch (e) {
       toast((e as Error).message, "error");
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -54,6 +74,11 @@ export default function HostDashboard() {
 
       {!listings ? (
         <p className="text-gray-500">Loading...</p>
+      ) : loadError ? (
+        <div className="rounded-xl bg-gray-50 p-8 text-center">
+          <p className="text-gray-600">{loadError}</p>
+          <button onClick={load} className="mt-3 font-semibold underline">Try again</button>
+        </div>
       ) : listings.length === 0 ? (
         <p className="rounded-xl bg-gray-50 p-8 text-center text-gray-500">You have no listings yet.</p>
       ) : (
@@ -68,7 +93,7 @@ export default function HostDashboard() {
               <Link href={`/host/edit/${l.id}`} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium hover:border-black">
                 Edit
               </Link>
-              <button onClick={() => remove(l)} className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
+              <button onClick={() => setPendingDelete(l)} className="rounded-lg border border-red-300 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50">
                 Delete
               </button>
             </div>
@@ -102,6 +127,18 @@ export default function HostDashboard() {
             </tbody>
           </table>
         </div>
+      )}
+      {pendingDelete && (
+        <ConfirmationDialog
+          title="Delete this listing?"
+          description={`“${pendingDelete.title}” and its reservations will be permanently deleted. This can’t be undone.`}
+          cancelLabel="Keep listing"
+          confirmLabel="Delete listing"
+          busyLabel="Deleting..."
+          busy={deleting}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={remove}
+        />
       )}
     </div>
   );

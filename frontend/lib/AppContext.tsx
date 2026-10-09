@@ -46,10 +46,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // reload the wishlist whenever the user changes
   useEffect(() => {
     if (!user) return;
+    let active = true;
     api<{ id: number }[]>(`/wishlist?user_id=${user.id}`)
-      .then((rows) => setWishlist(rows.map((r) => r.id)))
-      .catch(() => {});
-  }, [user]);
+      .then((rows) => { if (active) setWishlist(rows.map((r) => r.id)); })
+      .catch(() => {
+        if (active) toast("Could not load your wishlist", "error");
+      });
+    return () => { active = false; };
+  }, [user, toast]);
 
   function setUserId(id: number) {
     const u = users.find((x) => x.id === id);
@@ -61,12 +65,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   async function toggleWishlist(listingId: number) {
     if (!user) return;
-    const res = await api<{ saved: boolean }>(
-      `/wishlist/toggle?user_id=${user.id}&listing_id=${listingId}`,
-      { method: "POST" }
-    );
-    setWishlist((w) => (res.saved ? [...w, listingId] : w.filter((x) => x !== listingId)));
-    toast(res.saved ? "Added to wishlist" : "Removed from wishlist");
+    try {
+      const res = await api<{ saved: boolean }>(
+        `/wishlist/toggle?user_id=${user.id}&listing_id=${listingId}`,
+        { method: "POST" }
+      );
+      setWishlist((w) => (res.saved ? [...w, listingId] : w.filter((x) => x !== listingId)));
+      toast(res.saved ? "Added to wishlist" : "Removed from wishlist");
+    } catch (error) {
+      toast((error as Error).message, "error");
+    }
   }
 
   return (

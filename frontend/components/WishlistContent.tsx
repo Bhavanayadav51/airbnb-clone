@@ -6,13 +6,21 @@ import { useApp } from "@/lib/AppContext";
 import ListingCard from "./ListingCard";
 
 export default function WishlistContent() {
-  const { user, wishlist } = useApp();
+  const { user, wishlist, toast } = useApp();
   const [items, setItems] = useState<Listing[] | null>(null);
 
   useEffect(() => {
     if (!user) return;
-    api<Listing[]>(`/wishlist?user_id=${user.id}`).then(setItems).catch(() => setItems([]));
-  }, [user]);
+    let active = true;
+    api<Listing[]>(`/wishlist?user_id=${user.id}`)
+      .then((list) => { if (active) setItems(list); })
+      .catch(() => {
+        if (!active) return;
+        toast("Could not load your wishlist", "error");
+        setItems([]);
+      });
+    return () => { active = false; };
+  }, [user, toast]);
 
   if (!items) return <p className="py-20 text-center text-gray-500">Loading...</p>;
 

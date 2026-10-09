@@ -2,6 +2,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { AMENITIES } from "@/lib/constants";
+import { useApp } from "@/lib/AppContext";
 
 const TYPES = [
   { name: "All", icon: "🌍" },
@@ -16,11 +17,21 @@ const TYPES = [
 export default function CategoryBar() {
   const router = useRouter();
   const params = useSearchParams();
+  const { toast } = useApp();
+  const key = params.toString();
   const active = params.get("property_type") || "All";
   const [open, setOpen] = useState(false);
-  const [min, setMin] = useState(params.get("min_price") || "");
-  const [max, setMax] = useState(params.get("max_price") || "");
-  const [amen, setAmen] = useState<string[]>((params.get("amenities") || "").split(",").filter(Boolean));
+  const [draft, setDraft] = useState<{
+    key: string; min: string; max: string; amen: string[];
+  } | null>(null);
+  const current = draft?.key === key ? draft : null;
+  const min = current?.min ?? params.get("min_price") ?? "";
+  const max = current?.max ?? params.get("max_price") ?? "";
+  const amen = current?.amen ?? (params.get("amenities") || "").split(",").filter(Boolean);
+
+  function updateDraft(changes: Partial<Omit<NonNullable<typeof draft>, "key">>) {
+    setDraft({ key, min, max, amen, ...changes });
+  }
 
   // change some URL params and keep the rest
   function update(changes: Record<string, string>) {
@@ -29,7 +40,8 @@ export default function CategoryBar() {
     router.push(`/?${p.toString()}`);
   }
 
-  const toggle = (a: string) => setAmen((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]));
+  const toggle = (a: string) =>
+    updateDraft({ amen: amen.includes(a) ? amen.filter((x) => x !== a) : [...amen, a] });
 
   return (
     <div className="flex items-center justify-between gap-6 border-b border-gray-100 pt-2">
@@ -62,9 +74,9 @@ export default function CategoryBar() {
 
             <h3 className="mb-3 font-semibold">Price range (per night)</h3>
             <div className="flex gap-4">
-              <input type="number" placeholder="Min ₹" value={min} onChange={(e) => setMin(e.target.value)}
+              <input type="number" min="0" placeholder="Min ₹" value={min} onChange={(e) => updateDraft({ min: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-black" />
-              <input type="number" placeholder="Max ₹" value={max} onChange={(e) => setMax(e.target.value)}
+              <input type="number" min="0" placeholder="Max ₹" value={max} onChange={(e) => updateDraft({ max: e.target.value })}
                 className="w-full rounded-lg border border-gray-300 p-3 outline-none focus:border-black" />
             </div>
 
@@ -79,13 +91,24 @@ export default function CategoryBar() {
 
             <div className="mt-8 flex items-center justify-between">
               <button
-                onClick={() => { setMin(""); setMax(""); setAmen([]); update({ min_price: "", max_price: "", amenities: "" }); setOpen(false); }}
+                onClick={() => { updateDraft({ min: "", max: "", amen: [] }); update({ min_price: "", max_price: "", amenities: "" }); setOpen(false); }}
                 className="font-semibold underline"
               >
                 Clear all
               </button>
               <button
-                onClick={() => { update({ min_price: min, max_price: max, amenities: amen.join(",") }); setOpen(false); }}
+                onClick={() => {
+                  if (min && Number(min) < 0 || max && Number(max) < 0) {
+                    toast("Prices cannot be negative", "error");
+                    return;
+                  }
+                  if (min && max && Number(min) > Number(max)) {
+                    toast("Minimum price cannot exceed maximum price", "error");
+                    return;
+                  }
+                  update({ min_price: min, max_price: max, amenities: amen.join(",") });
+                  setOpen(false);
+                }}
                 className="rounded-lg bg-[#222] px-6 py-3 font-medium text-white hover:bg-black"
               >
                 Show places

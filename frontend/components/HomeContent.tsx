@@ -27,19 +27,24 @@ export default function HomeContent() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [loadedKey, setLoadedKey] = useState("");
   const [error, setError] = useState("");
 
-  async function load(pageNum: number, append: boolean) {
-    setLoading(true);
-    setError("");
+  async function requestPage(pageNum: number) {
     const p = new URLSearchParams(key);
     p.set("page", String(pageNum));
     p.set("page_size", String(pageSize));
+    return api<{ items: Listing[]; total: number }>(`/listings?${p.toString()}`);
+  }
+
+  async function load(pageNum: number, append: boolean) {
+    setLoading(true);
     try {
-      const res = await api<{ items: Listing[]; total: number }>(`/listings?${p.toString()}`);
+      const res = await requestPage(pageNum);
       setItems((prev) => (append ? [...prev, ...res.items] : res.items));
       setTotal(res.total);
       setPage(pageNum);
+      setError("");
     } catch {
       setError("Could not load listings. Is the backend running?");
     } finally {
@@ -48,9 +53,38 @@ export default function HomeContent() {
   }
 
   useEffect(() => {
-    load(1, false);
+    let active = true;
+
+    async function refresh() {
+      try {
+        const res = await requestPage(1);
+        if (!active) return;
+        setItems(res.items);
+        setTotal(res.total);
+        setPage(1);
+        setError("");
+      } catch {
+        if (!active) return;
+        setItems([]);
+        setTotal(0);
+        setError("Could not load listings. Is the backend running?");
+      } finally {
+        if (active) {
+          setLoading(false);
+          setLoadedKey(key);
+        }
+      }
+    }
+
+    void refresh();
+    return () => {
+      active = false;
+    };
+    // requestPage captures the current search parameters from this render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
+
+  const isLoading = loading || loadedKey !== key;
 
   // dates and guests are carried over to the detail page
   const carry = new URLSearchParams();
@@ -84,25 +118,25 @@ export default function HomeContent() {
       <CategoryBar />
 
       {error && <p className="py-10 text-center text-red-600">{error}</p>}
-      {loading && items.length === 0 && skeleton}
+      {isLoading && items.length === 0 && skeleton}
 
       {searching ? (
         <>
-          {!loading && total > 0 && <p className="pt-6 text-sm font-medium">{total} place{total > 1 ? "s" : ""}</p>}
+          {!isLoading && total > 0 && <p className="pt-6 text-sm font-medium">{total} place{total > 1 ? "s" : ""}</p>}
           <div className="grid grid-cols-2 gap-x-4 gap-y-8 py-6 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
-            {items.map((l) => (
+            {(isLoading ? [] : items).map((l) => (
               <ListingCard key={l.id} listing={l} query={carry.toString()} />
             ))}
           </div>
 
-          {!loading && !error && items.length === 0 && (
+          {!isLoading && !error && items.length === 0 && (
             <div className="py-20 text-center">
               <p className="text-xl font-semibold">No exact matches</p>
               <p className="mt-2 text-gray-500">Try changing or removing some of your filters.</p>
             </div>
           )}
 
-          {items.length < total && (
+          {!isLoading && items.length < total && (
             <div className="flex justify-center pb-16">
               <button
                 onClick={() => load(page + 1, true)}

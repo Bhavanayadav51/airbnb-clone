@@ -30,9 +30,32 @@ COMMENTS = [
 PER_CITY = 10
 
 
+def seed_sample_bookings(db, guest_id):
+    today = date.today()
+    for listing_id, start, nights in [(1, 10, 4), (2, 20, 3)]:
+        existing = db.query(models.Booking).filter_by(
+            listing_id=listing_id, status="confirmed",
+        ).first()
+        if existing:
+            continue
+        listing = db.get(models.Listing, listing_id)
+        if listing is None:
+            continue
+        db.add(models.Booking(
+            listing_id=listing_id, guest_id=guest_id, check_in=today + timedelta(days=start),
+            check_out=today + timedelta(days=start + nights), guests=2,
+            total_price=round(nights * listing.price_per_night * 1.14),
+        ))
+    db.commit()
+
+
 def seed():
     db = SessionLocal()
-    if db.query(models.User).count() > 0:
+    existing_users = db.query(models.User).all()
+    if existing_users:
+        guest = next((user for user in existing_users if user.role == "guest"), None)
+        if guest:
+            seed_sample_bookings(db, guest.id)
         db.close()
         return
 
@@ -74,14 +97,6 @@ def seed():
             ))
     db.commit()
 
-    # two existing bookings that block dates
-    today = date.today()
-    for lid, start, nights in [(1, 10, 4), (2, 20, 3)]:
-        price = db.get(models.Listing, lid).price_per_night
-        db.add(models.Booking(
-            listing_id=lid, guest_id=users[2].id, check_in=today + timedelta(days=start),
-            check_out=today + timedelta(days=start + nights), guests=2,
-            total_price=round(nights * price * 1.14),
-        ))
-    db.commit()
+    # Two sample reservations make unavailable dates visible on first launch.
+    seed_sample_bookings(db, users[2].id)
     db.close()
