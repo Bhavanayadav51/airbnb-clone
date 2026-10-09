@@ -1,229 +1,133 @@
-# StayScape — Full-Stack Stays Marketplace
+# Airbnb Clone
 
-<p align="center">
-  <strong>A modern Airbnb-inspired platform for discovering stays, managing properties, and booking trips.</strong>
-</p>
+A full-stack Airbnb-style web app. Guests can browse and search stays, view listing details, book a date range, and see their trips. Hosts can create, edit and delete their own listings and see reservations.
 
-<p align="center">
-  <a href="https://airbnb-clone-alpha-five.vercel.app/">🌐 Live Demo</a> ·
-  <a href="https://github.com/Bhavanayadav51/airbnb-clone">📂 Source Code</a> ·
-  <a href="https://airbnb-clone-z3iv.onrender.com/docs">📘 API Documentation</a>
-</p>
+- **Live demo:** https://YOUR-APP.vercel.app
+- **API docs:** https://YOUR-API.onrender.com/docs
+- **GitHub:** https://github.com/YOUR-USERNAME/airbnb-clone
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Next.js-App%20Router-black?logo=next.js" alt="Next.js" />
-  <img src="https://img.shields.io/badge/TypeScript-Frontend-blue?logo=typescript" alt="TypeScript" />
-  <img src="https://img.shields.io/badge/FastAPI-Backend-009688?logo=fastapi" alt="FastAPI" />
-  <img src="https://img.shields.io/badge/SQLAlchemy-ORM-red" alt="SQLAlchemy" />
-  <img src="https://img.shields.io/badge/SQLite-Database-003B57?logo=sqlite" alt="SQLite" />
-</p>
+> The backend is on a free host that sleeps when idle, so the first request can take 30-60 seconds.
 
-## Overview
+## Features
 
-StayScape is a full-stack vacation rental marketplace developed as an SDE full-stack assignment. It recreates the core browsing, search, property management, and booking experience of a modern accommodation platform.
+- **Home and search:** city rows, search bar (location, dates, guests), category row, price and amenity filters, "Show more" pagination
+- **Listing page:** photo gallery, description, host info, amenities, availability calendar, price breakdown, reviews, map
+- **Booking:** date and guest validation, no overlapping dates, mocked checkout, confirmation, "My Trips" with cancellation
+- **Host:** dashboard of own listings and reservations, create / edit / delete listings
+- **Airbnb experience:** wishlist, toast notifications, modals, loading states
+- **Guest vs host:** account switcher in the top-right menu (mocked login)
 
-The application combines a responsive Next.js frontend with a Python FastAPI backend and a relational SQLite database. It supports separate guest and host workflows, authenticated actions, reservation validation, and persistent application data within the configured database.
+## Tech stack
 
-**Live application:** https://airbnb-clone-alpha-five.vercel.app/
-
-## Key Features
-
-### Explore and Search
-- Browse photo-rich property listings.
-- Search and filter by destination, dates, guests, price, property type, and amenities.
-- View detailed property information, amenities, host details, and reviews.
-- Navigate property details and availability.
-
-### Authentication and Sessions
-- Register as a guest or host.
-- Sign in with email and password.
-- Store passwords as PBKDF2-SHA256 hashes.
-- Use expiring, revocable bearer-token sessions.
-- Verify accounts through a six-digit demonstration code.
-
-### Booking Workflow
-- Validate check-in, check-out, and guest counts.
-- Prevent overlapping confirmed reservations.
-- Calculate nightly totals and a 14% service fee.
-- View trips and cancel reservations.
-- Reflect confirmed reservations in listing availability.
-
-### Host Dashboard
-- Create, view, edit, and delete owned listings.
-- Manage property information, pricing, amenities, and images.
-- View reservations for hosted properties.
-- Review guest and booking information.
-
-### Additional Features
-- Per-account wishlist.
-- Host and guest messaging associated with reservations.
-- Booking and message notifications.
-- Mark notifications as read.
-- Light and dark themes.
-- Responsive marketplace interface.
-
-## Tech Stack
-
-| Layer | Technology |
+| Part | Technology |
 |---|---|
-| Frontend | Next.js App Router, React, TypeScript |
-| Styling | Tailwind CSS |
-| Backend | Python, FastAPI, Pydantic |
-| ORM | SQLAlchemy |
+| Frontend | Next.js (TypeScript), Tailwind CSS |
+| Backend | Python, FastAPI, SQLAlchemy |
 | Database | SQLite |
-| Frontend hosting | Vercel |
-| Backend hosting | Render |
+| Hosting | Vercel (frontend), Render (backend) |
 
-## Architecture
+## Setup
 
-```text
-                   User / Browser
-                         |
-                         v
-              Next.js + TypeScript
-                  (Vercel)
-                         |
-                    HTTP / JSON
-                         |
-                         v
-                FastAPI REST API
-                  (Render)
-                         |
-                         v
-                    SQLAlchemy
-                         |
-                         v
-                      SQLite
-```
+Requirements: Python 3.10+, Node.js 20+.
 
-The frontend communicates with the backend through API requests. Protected operations use bearer sessions, while the backend determines the authenticated user and checks resource ownership before allowing sensitive actions.
-
-## Database Design
-
-The application uses a relational schema with the following main tables:
-
-| Table | Responsibility |
-|---|---|
-| `users` | User profiles, password hashes, and verification status |
-| `auth_sessions` | Session expiration and revocation |
-| `listings` | Property information, pricing, amenities, and images |
-| `bookings` | Reservations, dates, guests, totals, and status |
-| `notifications` | Booking and message notifications |
-| `messages` | Reservation-linked conversations |
-| `reviews` | Property reviews and ratings |
-| `wishlist` | Saved listings for each user |
-
-**Booking integrity:** Check-in dates are inclusive and check-out dates are exclusive. Confirmed reservations cannot overlap for the same property, and cancelled bookings no longer block dates.
-
-## Getting Started
-
-### Prerequisites
-
-- Node.js and npm
-- Python 3
-- Git
-
-### 1. Clone the repository
+**1. Backend**
 
 ```bash
-git clone https://github.com/Bhavanayadav51/airbnb-clone.git
-cd airbnb-clone
-```
-
-### 2. Set up the backend
-
-On Windows PowerShell:
-
-```powershell
 cd backend
-py -m venv venv
-.\venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-python -m uvicorn main:app --reload
+python -m venv .venv
+.venv\Scripts\activate        # Mac/Linux: source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload
 ```
 
-The API runs at `http://127.0.0.1:8000`.
+Runs at http://127.0.0.1:8000 (API docs at `/docs`). On first start the database is created and seeded automatically (3 users, 60 listings in 6 cities, reviews, and 2 existing bookings). To reset the data: `python reset_db.py`.
 
-Interactive API documentation is available at `http://127.0.0.1:8000/docs`.
+**2. Frontend**
 
-### 3. Set up the frontend
-
-Open a second terminal from the repository root:
-
-```powershell
+```bash
 cd frontend
 npm install
+```
+
+Create `frontend/.env.local`:
+
+```
+NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+```
+
+```bash
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open http://localhost:3000.
 
-### 4. Configure the API URL
+**Demo accounts** (switch in the top-right menu): Bhavana (guest), Aarav (host), Meera (host).
 
-For local development, the frontend defaults to `http://127.0.0.1:8000`.
+## Architecture
 
-For a separately hosted deployment, configure the frontend environment variable:
+The frontend (Next.js) shows the UI and calls the backend (FastAPI) over REST/JSON. The backend owns all data and rules (availability, validation, ownership) and stores everything in SQLite.
 
-```env
-NEXT_PUBLIC_API_URL=https://your-backend-url.onrender.com
+```
+airbnb-clone/
+├── backend/
+│   ├── main.py         # API endpoints and business rules
+│   ├── models.py       # database tables
+│   ├── database.py     # DB connection
+│   ├── seed.py         # sample data
+│   └── reset_db.py     # wipe and reseed
+└── frontend/
+    ├── app/            # pages (/, /listing/[id], /trips, /wishlist, /host ...)
+    ├── components/     # reusable UI (cards, calendar, modals, forms)
+    └── lib/            # API helper, shared state, date utils
 ```
 
-Use your actual backend URL. Configure the corresponding production variable in Vercel and redeploy after changes.
+- All API calls go through one helper (`lib/api.ts`).
+- Search and filters are stored in the URL, so results can be shared.
+- Current user, wishlist and toasts are kept in one React context.
 
-### 5. Run production checks
+## Database schema
 
-From the `frontend` directory:
+| Table | Columns | Relationships |
+|---|---|---|
+| `users` | id, name, role (guest/host), avatar | |
+| `listings` | id, host_id, title, description, location, property_type, price_per_night, max_guests, bedrooms, amenities (JSON), images (JSON), created_at | `host_id` -> users |
+| `bookings` | id, listing_id, guest_id, check_in, check_out, guests, total_price, status (confirmed/cancelled), created_at | `listing_id` -> listings, `guest_id` -> users |
+| `reviews` | id, listing_id, user_id, rating (1-5), comment, created_at | -> listings, -> users |
+| `wishlist` | id, user_id, listing_id (unique pair) | -> users, -> listings |
 
-```bash
-npm run lint
-npm run build
-```
+One host has many listings. A listing has many bookings and reviews. A listing's rating is the average of its reviews.
 
-## API Overview
+## API overview
 
 | Method | Endpoint | Purpose |
 |---|---|---|
-| POST | `/auth/register` | Register an account |
-| POST | `/auth/verify-email` | Verify the demo code |
-| POST | `/auth/login` | Sign in |
-| POST | `/auth/logout` | Revoke a session |
-| GET | `/listings` | Search and filter listings |
-| GET | `/listings/{listing_id}` | Retrieve listing details |
-| GET | `/listings/{listing_id}/booked-dates` | Retrieve booked dates |
-| POST / PUT / DELETE | `/listings` and `/listings/{listing_id}` | Manage listings |
-| POST | `/bookings` | Create a reservation |
-| GET | `/bookings` | Retrieve guest trips |
-| DELETE | `/bookings/{booking_id}` | Cancel a reservation |
-| GET | `/host/listings` | Retrieve host properties |
-| GET | `/host/bookings` | Retrieve host reservations |
-| GET | `/notifications` | Retrieve notifications |
-| GET / POST | `/conversations/{booking_id}/messages` | Read or send messages |
-| GET | `/wishlist` | Retrieve saved listings |
+| GET | `/listings` | Search and paginate (`q`, `min_price`, `max_price`, `property_type`, `guests`, `amenities`, `check_in`, `check_out`, `page`) |
+| GET | `/listings/{id}` | Listing details with reviews |
+| GET | `/listings/{id}/booked-dates` | Occupied nights for the calendar |
+| POST / PUT / DELETE | `/listings`, `/listings/{id}` | Host CRUD (owner only) |
+| POST | `/bookings` | Create a booking |
+| GET | `/bookings?guest_id=` | My Trips |
+| DELETE | `/bookings/{id}?guest_id=` | Cancel a booking |
+| GET | `/host/{id}/listings` | Host's listings |
+| GET | `/host/{id}/bookings` | Reservations for a host |
+| GET | `/wishlist?user_id=` | Saved listings |
+| POST | `/wishlist/toggle` | Save / unsave a listing |
 
-See the live API documentation for the available request schemas and responses.
+Full interactive docs are at `/docs`.
 
-## Important Demo Limitations
+## Assumptions and design decisions
 
-- **Email verification:** The six-digit code is displayed by the application; it is not delivered through a real email provider.
-- **Payments:** Checkout is simulated. No payment is collected or processed.
-- **Database persistence:** The deployed backend uses SQLite. Its data may be lost when a temporary hosting filesystem is reset or the service is redeployed. Persistent storage is needed for reliable production data retention.
-- **Security hardening:** The project is an assignment/demo implementation. Production use would require additional measures such as rate limiting, account recovery, hardened session handling, and real email verification.
+- **No overlapping bookings:** a booking conflicts when `existing.check_in < new.check_out AND existing.check_out > new.check_in`. The checkout day stays free for the next guest. The same rule hides unavailable listings in search.
+- **Backend validation:** the calendar blocks bad dates, but the backend checks every booking again (dates, guest count, overlap, own listing) and returns clear errors.
+- **Cancellation** sets the booking status to `cancelled` instead of deleting it. Only `confirmed` bookings block dates.
+- **Price** = nights x nightly rate + 14% service fee, calculated by the backend.
+- **Mocked login:** an account switcher replaces authentication. Host-only and owner-only rules are still enforced in the backend.
+- **Mocked payment:** checkout is simulated, no real charge.
+- **Images** are Unsplash placeholders; hosts add photos by URL.
+- **Map** is an OpenStreetMap embed centred on the listing's city.
+- **Free hosting:** the SQLite file resets when the backend restarts, so the seed runs again on startup. Bookings on the live demo may disappear after a restart.
+- **UI** closely follows Airbnb's layout and interactions but is not pixel-exact.
 
-## Assignment Context
+## Placeholders (not implemented)
 
-This project was built to demonstrate full-stack development skills across frontend engineering, REST API design, relational database modeling, authentication, reservation validation, and deployment.
-
-The implementation focuses on functional browse/search/booking workflows and host property management while using mock services where real payment and email integrations are outside the assignment scope.
-
-## Future Improvements
-
-- Integrate a real email verification provider.
-- Add automated backend API and frontend integration tests.
-- Move production data to a managed database or persistent storage.
-- Add a real payment provider in a suitable production environment.
-- Improve accessibility and expand responsive UI testing.
-- Add automated CI checks for pull requests.
-
----
-
-**Built with Next.js, TypeScript, FastAPI, and SQLite.**
+Messaging, identity verification, real payments, Experiences and Services tabs ("coming soon"), dark mode, and review submission after a stay.
