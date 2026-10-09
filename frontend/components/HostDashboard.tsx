@@ -20,8 +20,8 @@ export default function HostDashboard() {
     setLoadError("");
     try {
       const [hostListings, hostBookings] = await Promise.all([
-        api<Listing[]>(`/host/${user.id}/listings`),
-        api<Booking[]>(`/host/${user.id}/bookings`),
+        api<Listing[]>("/host/listings"),
+        api<Booking[]>("/host/bookings"),
       ]);
       setListings(hostListings);
       setBookings(hostBookings);
@@ -41,7 +41,7 @@ export default function HostDashboard() {
     if (!user || !pendingDelete) return;
     setDeleting(true);
     try {
-      await api(`/listings/${pendingDelete.id}?host_id=${user.id}`, { method: "DELETE" });
+      await api(`/listings/${pendingDelete.id}`, { method: "DELETE" });
       toast("Listing deleted");
       setPendingDelete(null);
       await load();
@@ -52,15 +52,21 @@ export default function HostDashboard() {
     }
   }
 
-  if (!user) return null;
+  if (!user) {
+    return <div className="py-24 text-center"><p className="text-xl font-semibold">Sign in to manage your hosting</p><Link href="/auth" className="mt-3 inline-block font-semibold underline">Sign in or create an account</Link></div>;
+  }
 
   if (user.role !== "host") {
     return (
       <div className="py-24 text-center">
         <p className="text-xl font-semibold">Hosting is for host accounts</p>
-        <p className="mt-2 text-gray-500">Use the top-right menu to switch to a host account.</p>
+        <p className="mt-2 text-gray-500">Create a separate host account to list a property.</p>
       </div>
     );
+  }
+
+  if (!user.email_verified) {
+    return <p className="py-24 text-center text-gray-600">Verify your email before managing listings.</p>;
   }
 
   return (
@@ -117,11 +123,19 @@ export default function HostDashboard() {
               {bookings.map((b) => (
                 <tr key={b.id} className="border-t border-gray-100">
                   <td className="p-3">{b.listing_title}</td>
-                  <td className="p-3">{b.guest_name}</td>
+                  <td className="p-3">
+                    <div className="flex items-center gap-2">
+                      <img src={b.guest_avatar} alt="" className="h-7 w-7 rounded-full" />
+                      <span>{b.guest_name}{b.guest_verified && <span className="ml-1 text-xs text-green-700">✓ verified</span>}</span>
+                    </div>
+                  </td>
                   <td className="p-3">{fmt(b.check_in)} - {fmt(b.check_out)}</td>
                   <td className="p-3">{b.guests}</td>
                   <td className="p-3">{inr(b.total_price)}</td>
-                  <td className="p-3 capitalize">{b.status}</td>
+                  <td className="p-3 capitalize">
+                    <span>{b.status}</span>
+                    <Link href={`/messages?booking=${b.id}`} className="ml-3 font-semibold underline">Message guest</Link>
+                  </td>
                 </tr>
               ))}
             </tbody>

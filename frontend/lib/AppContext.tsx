@@ -5,9 +5,12 @@ import { api, User } from "./api";
 type ToastState = { msg: string; type: "success" | "error" } | null;
 
 type AppCtx = {
-  users: User[];
   user: User | null;
-  setUserId: (id: number) => void;
+  authReady: boolean;
+  theme: "light" | "dark";
+  toggleTheme: () => void;
+  setAuthenticated: (token: string, user: User) => void;
+  signOut: () => Promise<void>;
   wishlist: number[];
   toggleWishlist: (listingId: number) => Promise<void>;
   toast: (msg: string, type?: "success" | "error") => void;
@@ -22,8 +25,9 @@ export function useApp() {
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [users, setUsers] = useState<User[]>([]);
   const [user, setUser] = useState<User | null>(null);
+  const [authReady, setAuthReady] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
   const [wishlist, setWishlist] = useState<number[]>([]);
   const [toastState, setToastState] = useState<ToastState>(null);
 
@@ -32,59 +36,95 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setTimeout(() => setToastState(null), 3000);
   }, []);
 
-  // load users once, restore the previously chosen user from the browser
   useEffect(() => {
-    api<User[]>("/users")
-      .then((list) => {
-        setUsers(list);
-        const saved = Number(localStorage.getItem("userId"));
-        setUser(list.find((u) => u.id === saved) || list.find((u) => u.role === "guest") || list[0]);
+    const savedTheme = localStorage.getItem("theme");
+    const initialTheme = savedTheme === "dark" ? "dark" : "light";
+    document.documentElement.classList.toggle("dark", initialTheme === "dark");
+    Promise.resolve().then(() => setTheme(initialTheme));
+  }, []);
+
+  const toggleTheme = useCallback(() => {
+    setTheme((current) => {
+      const next = current === "dark" ? "light" : "dark";
+      localStorage.setItem("theme", next);
+      document.documentElement.classList.toggle("dark", next === "dark");
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem("authToken");
+    if (!token) {
+      Promise.resolve().then(() => setAuthReady(true));
+      return;
+    }
+    api<User>("/auth/me")
+      .then(setUser)
+      .catch((error: unknown) => {
+        localStorage.removeItem("authToken");
+        if (error instanceof Error && !error.message.includes("session has expired")) {
+          toast(error.message, "error");
+        }
       })
-      .catch(() => toast("Cannot reach the backend. Is it running?", "error"));
+      .finally(() => setAuthReady(true));
   }, [toast]);
 
-  // reload the wishlist whenever the user changes
   useEffect(() => {
     if (!user) return;
     let active = true;
-    api<{ id: number }[]>(`/wishlist?user_id=${user.id}`)
+    api<{ id: number }[]>("/wishlist")
       .then((rows) => { if (active) setWishlist(rows.map((r) => r.id)); })
-      .catch(() => {
-        if (active) toast("Could not load your wishlist", "error");
+      .catch((error: unknown) => {
+        if (active) toast(error instanceof Error ? error.message : "Could not load your wishlist", "error");
       });
     return () => { active = false; };
   }, [user, toast]);
 
-  function setUserId(id: number) {
-    const u = users.find((x) => x.id === id);
-    if (!u) return;
-    setUser(u);
-    localStorage.setItem("userId", String(id));
-    toast(`Switched to ${u.name}`);
-  }
+  const setAuthenticated = useCallback((token: string, nextUser: User) => {
+    localStorage.setItem("authToken", token);
+    setUser(nextUser);
+  }, []);
+
+  const signOut = useCallback(async () => {
+    try {
+      await api("/auth/logout", { method: "POST" });
+      toast("You are signed out");
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "Could not sign out from the server", "error");
+    } finally {
+      localStorage.removeItem("authToken");
+      setUser(null);
+      setWishlist([]);
+    }
+  }, [toast]);
 
   async function toggleWishlist(listingId: number) {
-    if (!user) return;
+    if (!user) {
+      toast("Sign in to save listings", "error");
+      return;
+    }
     try {
       const res = await api<{ saved: boolean }>(
-        `/wishlist/toggle?user_id=${user.id}&listing_id=${listingId}`,
+        `/wishlist/toggle?listing_id=${listingId}`,
         { method: "POST" }
       );
       setWishlist((w) => (res.saved ? [...w, listingId] : w.filter((x) => x !== listingId)));
       toast(res.saved ? "Added to wishlist" : "Removed from wishlist");
     } catch (error) {
-      toast((error as Error).message, "error");
+      toast(error instanceof Error ? error.message : "Could not update your wishlist", "error");
     }
   }
 
   return (
-    <Ctx.Provider value={{ users, user, setUserId, wishlist, toggleWishlist, toast }}>
+    <Ctx.Provider value={{ user, authReady, theme, toggleTheme, setAuthenticated, signOut, wishlist, toggleWishlist, toast }}>
       {children}
       {toastState && (
         <div
           className={`fixed bottom-8 left-1/2 z-[100] -translate-x-1/2 rounded-xl px-5 py-3 text-sm font-medium text-white shadow-lg ${
             toastState.type === "error" ? "bg-[#C13515]" : "bg-[#222]"
           }`}
+          role="status"
+          aria-live="polite"
         >
           {toastState.msg}
         </div>

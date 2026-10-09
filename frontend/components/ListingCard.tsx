@@ -1,5 +1,6 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
+import { useState } from "react";
 import Link from "next/link";
 import { Listing, inr } from "@/lib/api";
 import { useApp } from "@/lib/AppContext";
@@ -9,15 +10,30 @@ export default function ListingCard({ listing, query = "" }: { listing: Listing;
   const saved = wishlist.includes(listing.id);
   const city = listing.location.split(",")[0];
   const favourite = (listing.rating ?? 0) >= 4.7;
+  const [imageIndex, setImageIndex] = useState(0);
+  const [imageUnavailable, setImageUnavailable] = useState(false);
 
   return (
     <Link href={`/listing/${listing.id}${query ? `?${query}` : ""}`} className="group block">
       <div className="relative aspect-square overflow-hidden rounded-2xl bg-gray-200">
-        <img
-          src={listing.images[0]}
-          alt={listing.title}
-          className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-        />
+        {imageUnavailable ? (
+          <div className="flex h-full items-center justify-center text-sm text-gray-500">
+            Photo unavailable
+          </div>
+        ) : (
+          <img
+            src={listing.images[imageIndex]}
+            alt={listing.title}
+            onError={() => {
+              if (imageIndex + 1 < listing.images.length) {
+                setImageIndex(imageIndex + 1);
+              } else {
+                setImageUnavailable(true);
+              }
+            }}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+          />
+        )}
         {favourite && (
           <span className="absolute left-3 top-3 rounded-full bg-white/95 px-3 py-1 text-[13px] font-medium shadow-sm">
             Guest favourite

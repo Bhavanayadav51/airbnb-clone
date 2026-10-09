@@ -1,9 +1,10 @@
 "use client";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api, Listing } from "@/lib/api";
 import { useApp } from "@/lib/AppContext";
-import { AMENITIES, PROPERTY_TYPES } from "@/lib/constants";
+import { AMENITIES, PROPERTY_TYPES, propertyPhotoUrls } from "@/lib/constants";
 
 type Field = React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>;
 
@@ -53,8 +54,7 @@ export default function ListingForm({ mode }: { mode: "create" | "edit" }) {
     setAmenities((cur) => (cur.includes(a) ? cur.filter((x) => x !== a) : [...cur, a]));
 
   function fillSamplePhotos() {
-    const seed = Math.floor(Math.random() * 10000);
-    setImages(Array.from({ length: 5 }, (_, i) => `https://picsum.photos/seed/new${seed}-${i}/900/700`).join("\n"));
+    setImages(propertyPhotoUrls(f.property_type).join("\n"));
   }
 
   async function submit(e: React.FormEvent) {
@@ -70,7 +70,6 @@ export default function ListingForm({ mode }: { mode: "create" | "edit" }) {
       await api(mode === "create" ? "/listings" : `/listings/${id}`, {
         method: mode === "create" ? "POST" : "PUT",
         body: JSON.stringify({
-          host_id: user.id,
           title: f.title.trim(), description: f.description, location: f.location.trim(),
           property_type: f.property_type,
           price_per_night: Number(f.price_per_night),
@@ -87,8 +86,14 @@ export default function ListingForm({ mode }: { mode: "create" | "edit" }) {
     }
   }
 
-  if (user && user.role !== "host") {
-    return <p className="py-24 text-center text-gray-600">Switch to a host account to manage listings.</p>;
+  if (!user) {
+    return <p className="py-24 text-center text-gray-600">Sign in with a verified host account to manage listings. <Link href="/auth" className="font-semibold underline">Sign in</Link></p>;
+  }
+  if (user.role !== "host") {
+    return <p className="py-24 text-center text-gray-600">A host account is required to manage listings.</p>;
+  }
+  if (!user.email_verified) {
+    return <p className="py-24 text-center text-gray-600">Verify your email before managing listings.</p>;
   }
   if (mode === "edit" && loadingListing) {
     return <p className="py-24 text-center text-gray-500">Loading listing...</p>;

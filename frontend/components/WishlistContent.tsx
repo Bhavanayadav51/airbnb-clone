@@ -12,7 +12,7 @@ export default function WishlistContent() {
   useEffect(() => {
     if (!user) return;
     let active = true;
-    api<Listing[]>(`/wishlist?user_id=${user.id}`)
+    api<Listing[]>("/wishlist")
       .then((list) => { if (active) setItems(list); })
       .catch(() => {
         if (!active) return;
@@ -22,6 +22,9 @@ export default function WishlistContent() {
     return () => { active = false; };
   }, [user, toast]);
 
+  if (!user) {
+    return <div className="py-24 text-center"><p className="text-xl font-semibold">Sign in to see your wishlist</p><Link href="/auth" className="mt-3 inline-block font-semibold underline">Sign in or create an account</Link></div>;
+  }
   if (!items) return <p className="py-20 text-center text-gray-500">Loading...</p>;
 
   // hide a card as soon as its heart is un-clicked

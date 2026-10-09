@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element */
 import { useCallback, useEffect, useState } from "react";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { api, Listing } from "@/lib/api";
 import { useApp } from "@/lib/AppContext";
 import { fmt, nightsBetween } from "@/lib/dates";
@@ -12,6 +12,7 @@ import CheckoutModal from "./CheckoutModal";
 
 export default function ListingDetail() {
   const { id } = useParams<{ id: string }>();
+  const router = useRouter();
   const sp = useSearchParams();
   const searchKey = sp.toString();
   const { user, toast, wishlist, toggleWishlist } = useApp();
@@ -57,7 +58,14 @@ export default function ListingDetail() {
   }
 
   function reserve() {
-    if (!user || !listing) return;
+    if (!user) {
+      toast("Sign in to book this stay", "error");
+      router.push("/auth");
+      return;
+    }
+    if (!listing) return;
+    if (user.role !== "guest") return toast("Use a guest account to book a stay", "error");
+    if (!user.email_verified) return toast("Verify your email before booking", "error");
     if (!checkIn || !checkOut) return toast("Select your check-in and checkout dates first", "error");
     if (user.id === listing.host.id) return toast("You can't book your own listing", "error");
     setCheckoutOpen(true);
@@ -82,7 +90,7 @@ export default function ListingDetail() {
         <div className="lg:col-span-2">
           <div className="flex items-center justify-between border-b border-gray-200 pb-6">
             <div>
-              <h2 className="text-xl font-semibold">{listing.property_type} hosted by {listing.host.name}</h2>
+              <h2 className="text-xl font-semibold">{listing.property_type} hosted by {listing.host.name}{listing.host.verified && <span className="ml-2 text-sm font-medium text-green-700">✓ Email verified</span>}</h2>
               <p className="mt-1 text-gray-500">
                 {listing.max_guests} guests · {listing.bedrooms} bedroom{listing.bedrooms > 1 ? "s" : ""}
               </p>

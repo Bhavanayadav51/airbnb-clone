@@ -2,7 +2,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { api, Booking, inr } from "@/lib/api";
+import { api, Booking, dispatchNotificationUpdate, inr } from "@/lib/api";
 import { useApp } from "@/lib/AppContext";
 import { fmt, iso } from "@/lib/dates";
 import ConfirmationDialog from "./ConfirmationDialog";
@@ -15,7 +15,7 @@ export default function TripsContent() {
 
   const load = useCallback(() => {
     if (!user) return;
-    api<Booking[]>(`/bookings?guest_id=${user.id}`)
+    api<Booking[]>("/bookings")
       .then(setTrips)
       .catch(() => {
         toast("Could not load your trips", "error");
@@ -32,7 +32,8 @@ export default function TripsContent() {
     if (!pendingCancel) return;
     setCancelling(true);
     try {
-      await api(`/bookings/${pendingCancel.id}?guest_id=${user.id}`, { method: "DELETE" });
+      await api(`/bookings/${pendingCancel.id}`, { method: "DELETE" });
+      dispatchNotificationUpdate();
       toast("Reservation cancelled");
       setPendingCancel(null);
       await load();
@@ -43,6 +44,9 @@ export default function TripsContent() {
     }
   }
 
+  if (!user) {
+    return <div className="py-24 text-center"><p className="text-xl font-semibold">Sign in to see your trips</p><Link href="/auth" className="mt-3 inline-block font-semibold underline">Sign in or create an account</Link></div>;
+  }
   if (!trips) return <p className="py-20 text-center text-gray-500">Loading...</p>;
 
   const today = iso(new Date());
@@ -72,9 +76,10 @@ export default function TripsContent() {
               )}
             </p>
             {isUpcoming(t) && (
-              <button onClick={() => setPendingCancel(t)} className="text-sm font-semibold underline">
-                Cancel
-              </button>
+              <div className="flex gap-4">
+                <Link href={`/messages?booking=${t.id}`} className="text-sm font-semibold underline">Message host</Link>
+                <button onClick={() => setPendingCancel(t)} className="text-sm font-semibold underline">Cancel</button>
+              </div>
             )}
           </div>
         </div>
